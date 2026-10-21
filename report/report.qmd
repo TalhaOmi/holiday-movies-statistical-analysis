@@ -1,0 +1,623 @@
+---
+format:
+  pdf:
+    keep-tex: true
+    titlepage: true
+    include-in-header: 
+       text: |
+         \usepackage{fvextra}
+         \DefineVerbatimEnvironment{Highlighting}{Verbatim}{breaklines,commandchars=\\\{\}}
+bibliography: references.bib
+csl: ieee.csl
+link-citations: true
+include-before-body:
+  text: |
+    \RecustomVerbatimEnvironment{verbatim}{Verbatim}{
+      showspaces = false,
+      showtabs = false,
+      breaksymbolleft={},
+      breaklines
+      % Note: setting commandchars=\\\{\} here will cause an error 
+    }
+header-includes: |
+  \AtBeginDocument{
+    \title{
+      Report (Holiday Movies)
+    }
+    \author{
+      A A Talha Talukder \\
+    }
+    <!-- \date{ -->
+    <!--   \today -->
+    <!-- } -->
+    \maketitle
+    \begin{center}
+      \large{\textbf{Group number: 09}}  \\
+      \large{\textbf{Project ID: 07}} 
+    \end{center}
+  }
+  \usepackage{listings}
+  \lstset{
+    breaklines=true,
+    breakatwhitespace=true,
+    basicstyle=\ttfamily\footnotesize,
+    frame=single
+  }
+  \usepackage{ragged2e}
+  \justifying
+  \usepackage{booktabs}
+  \usepackage{longtable}
+  \usepackage{array}
+  \usepackage{graphicx}
+  \usepackage{float}
+  \floatplacement{table}{H}
+  \floatplacement{figure}{H}
+  \usepackage{caption}
+  \captionsetup[table]{skip=10pt}
+editor: visual
+output: 
+  pdf: 
+    documentclass: article
+    titlepage: true
+  html: 
+    toc: true
+  word: default
+appendix: true
+execute:
+  comment: false
+---
+
+\newpage
+<!--
+# Abstract
+
+This project analyzes the evolution of holiday-themed films from 1929 to 2023. We used a **TidyTuesday R Project on GitHub** [@tidytuesday] dataset compiled from IMDb, which includes 2,265 movies identified through keywords such as "Christmas," "Hanukkah," and "Kwanzaa." Our goal is to uncover trends in movie formats, genre preferences, and runtime durations using exploratory data analysis (EDA) and statistical methods. We reveal how technological shifts, such as the rise of television and streaming, have impacted the holiday movie industry.
+-->
+# Introduction
+
+Holiday movies serve as cultural touchpoints during festive seasons. Over the decades, this genre has expanded significantly. Using a comprehensive dataset (**TidyTuesday R Project on GitHub** [@tidytuesday]) of holiday-related films, this study explores how production trends, genre preferences, and movie characteristics have evolved. This work is particularly relevant as we assess how audience behavior and technology impact film creation.
+
+# Background
+
+A study conducted on [@rutledge2023] how hodiday movies have positive impact upon human. Holiday movies are often marked as part of American Christmas tradition along with the Christmas tree and cookies. To cure loniness and boredome, people tends to turn on their favorit TV show and holiday movies act as a powerful companion to lonliness and boost positive emotions.From early 21st century, TV-movies started gaining their popularities. As of [@follows2023] since 2000, the Hallmark Channel released more than 300 holiday TV-movies. TV-movies with low budget usually have short runtime than that of Theatrical release movies. With the raise of online streaming platforms like Netflix, Amazon Prime or Disney, videos are getting popular source of holiday movies. Along with the technological advancement, these type of changes we can find over the period. The change also incurred in the movie preference as we started to increase our emotional support and competability towerds technologies [@msuToday2023; @rutledge2023].
+
+Alongside the change in format, genre popularity of movies also shifted time to time. At the early stage, holiday movies mostly are Christmas movies and connected to the tradition, and religion [@favNews2023; @assortedFlavor2023]. Comedy, romance and family films used to be the top three genres of holiday movies that time. With the time, the new genres like animation, short films are gaining popularity. These transformations reflect both the industrial trends and psychological appeal of holiday storytelling. This intrigged our study on analysing shifts in holiday movies.
+
+# Data
+
+**Data Source and Collection:** The data comes from the **TidyTuesday R Project on GitHub** [@tidytuesday] project (2023-12-12 release), which provides structured datasets for weekly data challenges. It was originally sourced from IMDb via keyword filtering (titles containing "holiday", "Christmas", "Hanukkah", or "Kwanzaa"). The dataset spans **1929 to 2023** and contains **2,265 movies**. The sample likely overrepresents English-language Christmas films (due to the keyword approach) and more popular titles (since obscure films with no IMDb presence would be missed). We focus on this sample as representative of mainstream holiday films, while noting it is not an exhaustive or random representation of all holiday-themed content.
+
+**Data Structure:** Each row represents a movie (identified by a unique IMDb ID). Key variables include:
+
+-   `title_type`: production format (categorical: **movie** (theatrical), **tvMovie** (television movie), or **video** (direct-to-video/streaming release))
+-   `year`: release year
+-   `genres`: up to three genres (comma-separated) assigned to the movie (e.g., Comedy, Romance, Family)
+-   `runtime_minutes`: duration of the film in minutes
+-   `num_votes`, `average_rating`: viewer vote count and average rating on IMDb (proxies for popularity/quality)
+-   Indicator flags like `holiday`, `christmas`, etc., signifying the presence of those keywords in the title (used to filter the data initially)
+
+We derived additional variables to assist analysis. Notably, we created a `decade` variable to group release years (e.g., 1990–1999) for long-term trend analysis. We also expanded the `genres` field into multiple indicators: for certain analyses, each movie was effectively replicated for each of its genres (allowing us to count genre appearances). For other analyses, we designated a primary genre per movie to avoid double-counting (see Methodology). Movies missing `runtime_minutes` were excluded from runtime-based analyses.  
+
+<!--
+**Data Quality and Preprocessing:** The dataset required minimal cleaning since it was already well-structured. We confirmed that year ranges were as expected and that genre entries were valid. A small number of movies (13) had no genre information on IMDb, which we treat as missing genre. As noted, multi-genre entries introduce complexity: a single film can belong to multiple genres. We addressed this by creating both a **long format** (multiple rows per movie, one per genre) for exploratory genre counts, and a **wide format** with genre dummy variables for certain tests. No other major cleaning was necessary beyond handling missing runtimes and the creation of summary variables.
+-->
+**Data Context and Limitations:** There are some inherent biases and limitations. The keyword-based collection means that some holiday-themed films (e.g., ones implicitly about New Year but without obvious keywords) might be omitted. The data is **observational** and not randomly sampled—findings are descriptive of this dataset and cannot be assumed causal. Early decades (1920s–1950s) have very few entries, which limits our ability to generalize about those periods. Because later decades see an explosion of titles, comparisons over time should account for this imbalance (we often use proportions or separate tests by era). Despite these caveats, the dataset provides a rich basis to analyze broad trends in holiday movies over nearly a century.
+
+```{r}
+#| echo: false
+#| label: setup-data
+#| message: false
+#| warning: false
+
+# some global settings, data preparation and variables to ease the usage of different variables 
+# without worrying to create or load in multiple places
+
+# load tidyverse
+library(tidyverse)
+# load kableExtra
+library(kableExtra)
+library(readr)  
+
+# read data
+holiday_movies <- readr::read_csv('holiday_movies.csv')
+holiday_movie_genres <- readr::read_csv('holiday_movie_genres.csv')
+
+# create a decade variable for grouping years
+decade_label <- function(year) {
+  paste0(floor(year/10)*10, "-", ifelse(floor(year/10)*10 < 2020, 
+                                        floor(year/10)*10+9, 2023))
+}
+holiday_movies <- holiday_movies %>%
+  mutate(decade = sapply(year, decade_label))
+
+# create a wide-format dataset with one-hot encoding for genres (for contingency tests)
+holiday_movies_ext <- holiday_movies %>%
+  mutate(copy_genres = genres) %>%
+  separate_rows(copy_genres, sep = ",") %>%
+  mutate(dummy = 1) %>%
+  pivot_wider(names_from = copy_genres, values_from = dummy, values_fill = 0)
+
+# set a consistent theme for plots
+theme_set(theme_bw())
+```
+
+# Exploratory Data Analysis
+
+**Summary of Initial EDA:** In our preliminary exploration (Project Proposal stage), we discovered several patterns that guided our research questions. Notably, we observed a dramatic increase in the number of holiday films over time, especially driven by TV movies in the 2000s and 2010s. The genre distribution appeared to be dominated by a few categories (Comedy, Family, Drama, Romance), though many films span multiple genres. We also noticed potential differences in runtime by genre (e.g., animated films seemed shorter on average than live-action dramas). These EDA findings informed our choice of statistical analyses: we decided to investigate trends in format over time (RQ1), changes in production patterns across movie genres (RQ2), and runtime differences by genre (RQ3) with modeling techniques.
+
+Below, we present key EDA visualizations and summaries that set the stage for our analysis:
+
+## Format Distribution Over Decades
+
+To understand how production formats have changed, we tabulated the count of movies by format for each decade (see @tbl-decade-wise-count). Before 1970, almost all holiday films were theatrical releases. Starting in the 1980s, there was a noticeable surge in TV movies, which **exploded in the 2000s**. Direct-to-video releases appeared in the 1980s and peaked in the 1990s–2000s, then declined in the 2010s (likely supplanted by streaming platforms). This shift suggests a major change in content distribution models, as audiences embraced cable TV specials and later streaming-exclusive films for holiday content.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-decade-wise-count
+#| tbl-cap: "Decade and type wise holiday movie count."
+
+# function to categorize years into decades
+get_decade <- function(year) {
+  decade_start <- floor(year / 10) * 10
+  decade_end <- ifelse(decade_start < 2020, decade_start + 9, 2023)
+  return(paste0(decade_start, "-", decade_end))
+}
+
+# apply the function to create a decade column
+holiday_movies_with_decade <- holiday_movies %>%
+  mutate(Decade = sapply(year, get_decade))
+
+# count the number of movies, TV movies, and videos per decade
+df_summary_decade_wise <- holiday_movies_with_decade %>%
+  group_by(Decade, title_type) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  pivot_wider(names_from = title_type, values_from = Count, values_fill = list(Count = 0)) %>%
+  rename(Movie = movie, TVMovie = tvMovie, Video = video) %>%
+  mutate(Total = Movie + TVMovie + Video)
+
+# add a grand total row at the bottom
+grand_total <- df_summary_decade_wise %>%
+  summarise(
+    Decade = "Total",
+    Movie = sum(Movie),
+    TVMovie = sum(TVMovie),
+    Video = sum(Video),
+    Total = sum(Total)
+  )
+
+# combine the sorted data with the total row
+df_summary_decade_wise <- bind_rows(df_summary_decade_wise, grand_total)
+
+# display the table using kable
+kable(df_summary_decade_wise, booktabs = TRUE, longtable = TRUE) %>% 
+  kable_styling(full_width = FALSE, latex_options = c("striped", "scale_down")) %>% 
+   row_spec(0, bold = TRUE) %>% 
+   row_spec(nrow(df_summary_decade_wise)-1, hline_after = TRUE) %>% 
+   row_spec(nrow(df_summary_decade_wise), bold = TRUE)
+```
+
+## Movie Genre Production Changed
+
+Next, we examined which genres are most common in holiday movies. Many films have multiple genres, so we counted each genre appearance across all movies. @tbl-top-ten-genres-by-movie-count shows the top 10 genres by frequency. **Comedy, Drama, Romance, and Family** are the most prevalent genres — consistent with the warm, emotional themes typical of holiday films. Interestingly, **Animation** and **Fantasy** also appear in the top 10, reflecting the rise in production of animated specials and fantastical stories (e.g. Santa fantasies). We note that because a single movie can count toward multiple genres, these totals inflate the presence of broad genres (e.g., a "Comedy/Romance" film counts in both categories).
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-top-ten-genres-by-movie-count
+#| tbl-cap: "Top 10 genres by number of movies."
+
+# get top 10 genres by movie count
+top_10_gnr_mv_count <- holiday_movies %>%
+  separate_rows(genres, sep = ",") %>%
+  group_by(genres) %>%
+  summarise(Count = n()) %>%
+  rename(Genres = genres) %>% 
+  arrange(desc(Count)) %>%
+  head(10)
+
+# display the table
+kable(top_10_gnr_mv_count, booktabs = TRUE, longtable = TRUE) %>% 
+   kable_styling(full_width = FALSE, latex_options = c("striped", "scale_down")) %>% 
+   row_spec(0, bold = TRUE)
+```
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: fig-runtime-of-movies-by-genre
+#| fig-cap: "Runtime of movies by genre"
+#| fig-height: 3
+#| fig-width: 8
+#| fig-align: center
+
+# prepare data
+runtime_data <- holiday_movies %>%
+  separate_rows(genres, sep = ",") %>%
+  filter(!is.na(runtime_minutes))  # only rows with non-missing runtime_minutes values are included
+
+# create box plot
+ggplot(runtime_data, aes(x = genres, y = runtime_minutes)) +
+  geom_boxplot(fill = "steelblue", color = "black") +
+  labs(x = "Genre",
+       y = "Runtime (minutes)") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+## Runtime Variation
+
+We explored whether certain genres tend to have longer or shorter runtimes. The boxplot in [@fig-runtime-of-movies-by-genre] shows the distribution of film runtimes for each genre (for movies where runtime is available). Genres like **Animation** and **Short** clearly have lower median runtimes and narrower interquartile ranges, which makes sense as animated specials and short films are often brief. In contrast, **Drama**, **Fantasy**, and **Romance** genres exhibit higher median runtimes, indicating these films often have more extended storytelling. We also observe that some genres have considerable outliers — for example, a few **Musical** or **Anthology** films with unusually long runtimes. Overall, this visualization suggests that genres do differ in typical runtime, hinting that a statistical comparison (ANOVA) is warranted to confirm these differences.
+
+**Observations:** From [@fig-runtime-of-movies-by-genre], we note:
+
+-   Genres like **Animation** and **Short** have substantially lower median runtimes (often around 60–80 minutes) and less variability.
+-   Genres such as **Musical**, **Romance**, **Drama**, and **Fantasy** tend to have higher median runtimes (often 100+ minutes).
+-   Several genres show extreme outlier runtimes (e.g., some **Music** or **Documentary** entries that are either very short or very long relative to peers).
+
+These patterns support the idea that genre is related to runtime (we will formally test this in RQ3).
+
+Having set the context with EDA, we proceed to formalize our research questions and the methods we will use to answer them.
+
+# Research Questions
+
+Based on the EDA, we refined our focus to three primary research questions (RQs):
+
+-   **RQ1:** How has the production format of holiday movies (theatrical vs. TV vs. direct-to-video) changed over time?\
+    *Hypothesis:* Newer formats (especially TV movies) have grown exponentially in recent decades, overtaking theatrical releases.
+
+-   **RQ2:** Is there a significant variation in the number of movies produced by genre over time?\
+    *Hypothesis:* Holiday genre wise movie production have shifted, with some genres (like Romance) becoming more prevalent in recent years, indicating diversification beyond the traditional Comedy/Family dominance.
+
+-   **RQ3:** Do different genres differ significantly in average runtime?\
+    *Hypothesis:* Yes – for example, Animation and Short films will have lower average runtimes than Drama or Romance films, reflecting differences in target audience and storytelling scope.
+
+These questions aim to quantify the patterns observed qualitatively in the EDA. Next, we outline our methodology to address each question.
+
+# Methodology
+
+## Hypothesis Testing RQ1: Change in movie format
+
+### Population and Parameters
+
+Population is all holiday movies and sample dataset is 2265 movies from 1929 to 2023 as mentioned previously. We like to know about the increament in the movie count in each type (Theatrical, TV Movie & Video).
+
+### Hypothesis RQ1:
+
+Null Hypothesis: There is no significant increase in TV movies over the years.
+
+Alternative Hypothesis: TV Movies is increasing over the years significantly. 
+$$
+H_{0}: {\beta}_2 = 0\quad\text{vs}\quad H_{A}: {\beta}_2 > 0
+$$
+
+### Assumptions:
+
+Independence: The sample movies are randomly chosen among all holiday movies available in IBM listing.
+
+Normality: We are not approximating the sample, we are using the exact sampling distribution for sample proportion and do not need to check normality.
+
+### Test Statistics:
+
+We modeled the trend of holiday movie production over time. To test this we used both polynomial regression and time series analysis.
+
+***(a) Polynomial Regression***
+
+We chose polynomial (quadratic) regression because the increase in TV movies appeared non-linear (accelerating) and treat this as descriptive rather than predictive. The model is:
+
+$$
+\text{Count}_{TV}(\text{year}) = \beta_0 + \beta_1 (\text{year}) + \beta_2 (\text{year}^2)
+$$
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| include: false
+
+# get tvMovies
+tv_data <- holiday_movies %>%
+  filter(title_type == "tvMovie") %>%
+  count(year) %>%
+  mutate(year_sq = year^2)
+
+# check data
+# print(tv_data, n = Inf)
+
+# polynomial Regression 
+tv_model <- lm(n ~ year + year_sq, data = tv_data)
+```
+
+From the test, we found F= 95.17 with a p_value of 2.2e-16.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| include: false
+
+library(readr)  
+# compute count of each title_type by year
+type_trend <- holiday_movies %>%
+  group_by(year, title_type) %>%
+  summarise(count = n(), .groups = "drop")
+
+# run linear model
+model <- lm(count ~ year + I(year^2), data = type_trend)
+confint(tv_model, level = 0.95)
+```
+
+We found that both the linear and quadratic terms are statistically significant with $p = 2.2e-16\ (p< 0.001)$. Model's statistics Multiple $R^2$: 0.7454 with Adjusted $R^2$: 0.7376 indicate a strong fit.
+
+-   **Confidence Interval**
+
+From the CI Points we can state with 95% confidence that $\beta_1$ is between \[−132.4,−78.4\] and $\beta_2$ is in between \[0.020,0.034\].
+
+***(b) Time Series Analysis***
+
+Since the normality assumption was violated, we converted the yearly counts in to time series object so that we can visualize the long-term patterns.
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: fig-tv-movie-counts-over-time
+#| fig-cap: "TV Movie Counts Over Time"
+#| fig-height: 3
+#| fig-width: 8
+#| fig-align: center
+
+# display movie count in time-series like over the year
+ggplot(tv_data, aes(x = year, y = n)) +
+  geom_line() + 
+  labs(
+    x     = "Year",
+    y     = "Count"
+  )
+```
+
+The plot clearly shows the increase of TV movies over the period with an abrupt increment after 2000. The trend confirms the results from polynomial regression
+
+### Statistical Decision
+
+In particular, the quadratic coefficient $\beta_2$ is positive and significant, confirming significant change in the trend of movie type.From the time series analysis, we can also observe the similer idea of increasing TV movies. As both tests are showing increase in TV movies, we reject the null hypothesis.
+
+### Conclusion for RQ1:
+
+So we can conclude that there is enough evidence to reject the null hypothesis and the number of holiday TV movies has increased over the time.
+
+## Hypothesis Testing RQ2: Genre Shift in Movie Production
+
+### Population and Parameters
+
+This hypothesis testing is also done from the same dataset. We combined a few sparse categories (and focus on overall significance rather than individual cell contributions) to satisfy this in a broad sense. Each movie was counted once in the table (via its primary genre).
+
+### Hypothesis RQ2:
+
+Null Hypothesis: There is no significant shift of genre in terms of production.
+
+Alternative Hypothesis: There is significant shift of genre in terms of production.
+
+### Assumptions:
+
+Independence: The sample movies are randomly chosen among all holiday movies available in IBM listing.
+
+Normality: We are not approximating the sample, we are using the exact sampling distribution for sample proportion and do not need to check normality.
+
+### Test Statistics:
+
+We employed two approaches: *logistic regression* and *Chi-square test of independence*. To examine genre popularity shifts, we focused on both complementary analyses:
+
+**Logistic Regression**
+
+Logistic Regression is used to quantify the chanes in odds ratio of movies being a certain genre over time. We chose *Comedy* as primary representative and of genre as it was a populer genre in the early 1900s and used binary indicator. Logistic regression was appropriate because the outcome is binary (Comedy or not) and it estimates how the log-odds of being Comedy change per year.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| include: false
+
+# logistic regression for "Comedy or not" over years
+holiday_movies <- holiday_movies %>% 
+  mutate(is_comedy = str_detect(genres, "Comedy"))
+model_comedy <- glm(is_comedy ~ year, family = binomial, data = holiday_movies)
+summary(model_comedy)
+exp(coef(model_comedy))  # odds ratio for year
+```
+
+The logistic regression found a significant positive coefficient for year (estimate   0.00715, 𝑝 = 0.00424). This corresponds to an odds ratio of about 1.007 per year. In other words, each year, the odds of a holiday movie being a Comedy increase by approximately 0.7%. The 95% confidence interval supports the odd ration with 1.0023 to 1.0122 range and $p <0.01$ signifying steady increase.
+
+\newpage
+**Chi-square test of independence**
+
+Second, to assess overall genre distribution changes, we conducted a **Chi-square test of independence** between genre and decade.
+
+```{r}
+#| echo: false
+#| warning: false
+#| message: false
+#| include: false
+
+# construct contingency table of primary genre by decade
+holiday_movies <- holiday_movies %>% 
+  mutate(primary_genre = if_else(str_detect(genres, ","), 
+                                 str_extract(genres, "^[^,]+"), # first genre if multiple
+                                 genres))
+genre_decade_table <- table(holiday_movies$decade, holiday_movies$primary_genre)
+chisq.test(genre_decade_table)
+
+```
+
+The test yielded: $$
+\chi^2(df \approx 220) \= 758.68, \quad p < 2.2e-16 
+$$
+
+The test statistics 758.68 is very far from the 95% expected range (180 to 262.9729). 
+
+### Statistical decision
+
+We created a binary variable `is_comedy` indicating whether a movie is tagged as Comedy (i.e., at least one of its genres includes "Comedy"). We then performed a logistic regression with `is_comedy` as the outcome and `year` as the predictor and the p_value is 0.00424 (p \< 0.05). We found similer result when we performed Chi-Square test with very low p value (𝑝\< 0.001). With CI being far from the test statistics we are 95% confidence to reject the null hypothesis.
+
+### Conclusion Results for RQ2:
+
+We can conclude that we have enough evidence from both of logistic regration and Chi-Square test to reject the null hypothesis. The logistic regression provides evidence that at least one major genre (Comedy) has increased in probability over time. The Chi-square test more generally supports that genre popularity distribution has significantly changed by era (e.g., modern holiday films include relatively more Romance and less Music than mid-century ones, etc.).
+
+## Hypothesis Testing RQ3: Runtime Differences by Genre
+
+### Population and Parameters
+
+Using the same population and dataset, we have completed the hypothesis testing of runtime difference. We have counted each movie only once (mostly to its first category) to avoid counting one movie multiple times.
+
+### Hypothesis RQ3:
+
+Null Hypothesis: There is no significant difference in movie runtime among the various genres.
+
+Alternative Hypothesis: There is a significant difference in movie runtime among the various genres. 
+$$
+[ H_{0}: \mu_1 = \mu_2 = \mu_3 = \dots = \mu_k]\quad\text{Vs}\quad [ H_{a}:\text{  There  exists  at  least  one  } i, j \text{ such that } \mu_i \ne \mu_j ]
+$$
+
+### Assumptions:
+
+Independence: As we are working with same dataset, the indepences prevails.
+
+Variability: We have already shown boxplot for checking the variability to complare the runtime and genre. we can see the variability among each genre run time preference.
+
+### Test Statistics:
+
+We used **one-way ANOVA (Analysis of Variance)** to test whether the mean runtime differs across genres. The factor was genre, and the outcome was `runtime_minutes`. If the ANOVA found a significant effect, we planned a non-parametric **Kruskal-Wallis** test as a confirmation (which does not assume normality or equal variances). We also pre-specified performing post-hoc comparisons **Tukey’s HSD** (see @tbl-top-10-Significant-Genre-Pairs-from-Tukey-HSD) if ANOVA was significant, to identify which genres differ from each other.
+
+```{r}
+#| echo: false
+#| warning: false
+#| label: tbl-top-10-Significant-Genre-Pairs-from-Tukey-HSD
+#| tbl-cap: "Top 10 Significant Genre Pairs from Tukey HSD."
+#| include: false
+
+# ANOVA test for runtime by primary genre
+anova_data <- holiday_movies %>% 
+  filter(!is.na(runtime_minutes), !is.na(primary_genre))
+anova_runtime <- aov(runtime_minutes ~ primary_genre, data = anova_data)
+# summary(anova_runtime)
+
+# Kruskal-Wallis non-parametric test
+kruskal_result <- kruskal.test(runtime_minutes ~ primary_genre, data = anova_data)
+
+# Tukey HSD post-hoc test
+tukey_result <- TukeyHSD(anova_runtime)
+
+# Post-hoc: Tukey's HSD
+tukey_result <- TukeyHSD(anova_runtime)
+
+# convert to data frame and add comparison labels
+tukey_df <- as.data.frame(tukey_result$primary_genre)
+tukey_df$comparison <- rownames(tukey_result$primary_genre)
+
+# get top 10 comparisons with smallest p-values
+top10_tukey <- tukey_df %>%
+  arrange(`p adj`) %>%
+  slice_head(n = 10)
+
+# display in table
+top10_tukey %>%
+  select(comparison, diff, lwr, upr, `p adj`) %>%
+  kable(digits = 3, booktabs = TRUE, longtable = TRUE) %>%
+  kable_styling(full_width = FALSE, latex_options = c("striped", "scale_down"))
+```
+
+We conducted a one-way ANOVA to compare mean runtimes across genres, using each movie’s **primary genre** as the grouping variable. The ANOVA yielded:
+
+$$
+F(25, 4231) = 60.51, \quad p < 0.001
+$$ 
+
+Given the large F-statistic and unbalanced group sizes, we also ran a **Kruskal-Wallis test**, a non-parametric alternative that does not assume normality. The result again showed a significant difference in runtimes across genres ($p < 0.001$), confirming the robustness of the result regardless of test assumptions. 
+
+To explore which genres differ, we conducted **Tukey’s HSD post-hoc test**. Tukey's HSD test shows there is difference among runtime while testing with multiple pairs. As example, the runtime difference among Comedy-Animation, Drama-Animation, Animation-Action and Short-Comedy are 38.827, 41.741, -38.897 and -68.837. Given the large sample, many pairwise comparisons were significant (using an adjusted $p < 0.05$ threshold).
+
+### Statistical Decision:
+
+With the extremely low p-value (essentially zero to many decimal places) in every test (One-way ANOVA, Kruskal-Wallis Test & Tukey's HSD Post-Hoc Test) decisively rejects the null hypothesis that all genre means are equal.
+
+### Conclusion for RQ3:
+
+There is strong evidence that **different genres have different typical runtimes**. As hypothesized, genres aimed at younger audiences or designed as shorts (Animation, Short) have significantly lower runtimes than narrative-dense genres (Drama, Romance, Fantasy).
+
+# Implications of the Study
+
+*Format Adaptation:* Producer might put more focus on the TV movies or Videos as streaming platforms are getting more populer and can lower budgets and frequencies in releases
+
+*Genre Targeting:* Along with the populer genres like Comedy, Family, Romance, the film makers can focus on niche genres like holiday Horror or Sci-Fi as these are gaining populerities.
+
+*Runtime Planning:* Film-makers should note that runtime varies along with the difference in genress.
+
+*Cultural Reflection:* The change in movie type and genre preference reflect the cultural and technological advancement, so these should be considered while making films.
+
+# Limitations and Challenges
+
+Some limitation and challenges as listed here, but not limited to:
+
+- *Bias Dataset:* The dataset mostly considered English-language holiday films and potentially considering the holywood films only. Other language film industries might have different trend.
+- *Multi-Genre Complexity:* Most of the movies have multiple categories that make the genre analysis difficult and might not be considered in appropriate genre.
+- *Unexamined Factors:* We never considered the political or economical factors that might have impact on movie production during a particular period or on particular genre.
+
+The study is conducted only on the count of different types and genre movies over the period. That brings the scope to study further as following:
+
+- *Genre Popularity:* By considering the rating or popularity of each movie, further study can be done to check the actual popularity.
+- *Platform-Specific Trend Analysis:* There is scope to do trend analysis for each individual platform of theater, TV_movies and videos.
+- *Considering International Film Industry:* Both as a whole or individual study can be done considering other film industries around the world like films from India, China, Spain, German, England, French etc.
+
+# Conclusion
+
+From the early state of holiday movies to 2023, we tried to reflect the shifts from theatrical release to TV-movies to streatming platforms. We have also shown the trend of genre type and the runtime preference of each genre. We observe the shifts in top ten genres even though genre like comedy, family and romance still prevailing on the top 10 genre type. The study also clearely shows how runtime changes along with the change in genre reflecting the audiance tests.
+
+Many film makers might get idea of popular genre and runtime preference from this study. Many film enthusiast can choose between different movie type and get to entertain in their own way. Also, producer can focus on niche target audiance by using the streaming platform and choosing videos and TV-movies. They can also focus on the newer categories of film that are gaining popularities. Overall the study might predict the next important genre and movie type for producer/director/other film-makers.
+
+<!--
+\newpage
+
+# References
+
+-   Milán Janosov (2019). *Christmas Movies*. \[Central European University Network Data Science blog\] (analysis of Christmas movie networks).
+
+-   Stephen Follows (2020). *How many Hallmark Christmas movies are there?!* (Data analysis blog)​
+
+```         
+[stephenfollows.com](https://stephenfollows.com/p/how-many-hallmark-christmas-movies-are-there#:~:text=Let%E2%80%99s%20start%20our%20journey%20into,movie%20each%20and%20every%20week)
+```
+
+-   R packages: **tidyverse**, **ggplot2**, **infer**, **kableExtra** (for data manipulation, visualization, and reporting).
+
+-   Course Lectures (AMOD 5240, 2025) on ANOVA, Regression, and Model Evaluation – for guidance on methodology and assumptions.
+
+-   IMDb (Internet Movie Database) as the original source of movie information via TidyTuesday.
+
+-->
+
+\newpage
+
+# Acknowledgement
+
+-   We would like to give thanks to the TidyTuesday R Project on GitHub for the data [@tidytuesday].
+-   Additionally, we took help to debug tables, plot and data transformation codes in Stack overflow code snippets and Copilot.
+
+# References
+
+::: {#refs}
+:::
+
+\newpage
+
+# Appendix
+
+## Code
+
+```{r}
+#| echo: true 
+#| eval: false 
+#| ref-label: !expr knitr::all_labels()
+```
+
+::: ::::
+:::
